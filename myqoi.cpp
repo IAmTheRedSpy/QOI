@@ -46,7 +46,6 @@ void op_run (std::ostream& output, uint8_t& runLength) {
 
 void encode (std::ostream& output, pixelmatrix input, bool hasAlpha, uint8_t colorspace) {
     // Input must be a rectangular matrix
-    // Currently only works for input with alpha
     // Return an array of the encoded bytes
     std::array<struct pixel, 64> previouslySeen {};
     size_t index_position = 0;
