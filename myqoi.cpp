@@ -8,22 +8,40 @@
 
 #include "qoi.h"
 
-struct pixel {
-    uint8_t red;
-    uint8_t green;
-    uint8_t blue;
-    uint8_t alpha;
-};
+// TODO: Move functions to qoi.cpp
 bool operator==(const struct pixel& lhs, const struct pixel& rhs) {
         return lhs.red == rhs.red && lhs.green == rhs.green && lhs.blue == rhs.blue && lhs.alpha == rhs.alpha;
     }
-typedef std::vector<std::vector<struct pixel>> pixelmatrix;
 
 inline int hash(uint8_t red, uint8_t green, uint8_t blue, uint8_t alpha) {
     return (red*3 + green*5 + blue*7 + alpha*11) % 64;
 }
 inline int hash(struct pixel p) {
     return (p.red*3 + p.green*5 + p.blue*7 + p.alpha*11) % 64;
+}
+
+void op_rgb (std::ostream& output, struct pixel& curr) {
+    output.put(0xFE);
+    output.put(curr.red);
+    output.put(curr.green);
+    output.put(curr.blue);
+}
+
+void op_rgba (std::ostream& output, struct pixel& curr) {
+    output.put(0xFF);
+    output.put(curr.red);
+    output.put(curr.green);
+    output.put(curr.blue);
+    output.put(curr.alpha);
+}
+
+void op_index (std::ostream& output, size_t index_position) {
+    output.put(index_position);
+}
+
+void op_run (std::ostream& output, uint8_t& runLength) {
+    output.put(0xC0 | (runLength-1));
+    runLength = 0;
 }
 
 void encode (std::ostream& output, pixelmatrix input, bool hasAlpha, uint8_t colorspace) {
@@ -80,29 +98,31 @@ void encode (std::ostream& output, pixelmatrix input, bool hasAlpha, uint8_t col
             bool wasSeen = (savedPixel == curr);
             // Store as 8 bit tag is not seen, else 2 bit tag
             if (!wasSeen) {
+                // QOI_OP_RUN
                 if (runLength > 0) {
-                    output.put(0xC0 | (runLength-1));
-                    runLength = 0;
+                    op_run(output, runLength);
                 }
+                // QOI_OP_RGB or QOI_OP_RGBA
                 previouslySeen[index_position] = curr;
-                output.put(0xFF);
-                output.put(curr.red);
-                output.put(curr.green);
-                output.put(curr.blue);
-                output.put(curr.alpha);
+                if (hasAlpha) {
+                    op_rgba(output, curr);
+                }
+                else {
+                    op_rgb(output, curr);
+                }
                 lastWasIndex = false;
             }
-            // else if (lastWasIndex) {
-            //     // Can't store two indices in a row
+            else if (!lastWasIndex) {
+                // Can't store two indices in a row
+                // QOI_OP_INDEX
+                op_index(output, index_position);
+                lastWasIndex = true;
+            }
+            // else {
             //     // Find differences:
             //     uint8_t dg = 
             //     lastWasIndex = false;
             // }
-            else {
-                // Store index
-                output.put(index_position);
-                lastWasIndex = true;
-            }
 
             lastPixel = curr;
         }
@@ -139,14 +159,14 @@ int main(int argc, char const *argv[]) {
     }
     
 
-    const struct pixel STARTING = {0, 0, 0, 255};
+    // const struct pixel STARTING = {0, 0, 0, 255};
 
-    struct qoi_header header;
-    header.magic;
-    header.width = testData[0].size();
-    header.height = testData.size();
-    header.channels = 1;
-    header.colorspace = 1;
+    // struct qoi_header header;
+    // header.magic;
+    // header.width = testData[0].size();
+    // header.height = testData.size();
+    // header.channels = 1;
+    // header.colorspace = 0;
 
     
     {
